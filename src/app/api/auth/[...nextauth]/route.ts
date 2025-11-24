@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 
+export const runtime = 'edge';
+
 /**
  * MOCK NextAuth Route
  * 
@@ -58,4 +60,3 @@ export async function GET() {
         message: "This is a mock Auth endpoint. See file comments for integration details." 
     });
 }
-
