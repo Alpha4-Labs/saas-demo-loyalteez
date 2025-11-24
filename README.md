@@ -8,7 +8,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue)](https://www.typescriptlang.org/)
 [![Status](https://img.shields.io/badge/Status-Live-green)](https://saas-demo.loyalteez.app)
 
-**What this does:** A fully functional SaaS landing page, pricing page, and profile dashboard that rewards users with LTZ tokens for key actions. It demonstrates the **Server-Side (API)** integration pattern using Next.js API Routes.
+**What this does:** A fully functional SaaS landing page, pricing page, and profile dashboard that rewards users with LTZ tokens for key actions. It demonstrates **Client-Side Direct API** integration pattern.
 
 **Live Demo:** [saas-demo.loyalteez.app](https://saas-demo.loyalteez.app)
 
@@ -19,32 +19,28 @@
 ✅ **Newsletter Signup** (Acquisition) - Users earn LTZ tokens for subscribing.  
 ✅ **Profile Completion** (Activation) - Rewards for filling out user profile details.  
 ✅ **Subscription Upgrade** (Revenue) - Significant bonus for upgrading to paid plans.  
-✅ **Secure API Proxy** - Hides your Brand ID and logic behind a server-side API route.  
-✅ **Edge Runtime** - Optimized for Cloudflare Pages and Vercel Edge functions.  
+✅ **Direct API Integration** - Calls `api.loyalteez.app` directly from the browser.  
 ✅ **Real-time Feedback** - Instant UI updates upon reward distribution.
 
 ---
 
 ## 🏗️ Architecture
 
-The demo uses a **Server-Side Proxy Pattern** to ensure security and flexibility.
+The demo uses a **Client-Side Direct API Pattern** - the simplest and most reliable approach.
 
 ```mermaid
 graph LR
     User[User Action] -->|1. Click/Submit| Client[Client App]
-    Client -->|2. POST /api/manual-event| Proxy[Next.js API Route]
-    Proxy -->|3. Validate & Add Metadata| Proxy
-    Proxy -->|4. POST /manual-event| Loyalteez[Loyalteez API]
-    Loyalteez -->|5. Distribute Reward| Blockchain[Soneium Network]
-    Loyalteez -->|6. Success Response| Proxy
-    Proxy -->|7. Return Result| Client
-    Client -->|8. Show Notification| User
+    Client -->|2. POST /manual-event| Loyalteez[api.loyalteez.app]
+    Loyalteez -->|3. Distribute Reward| Blockchain[Soneium Network]
+    Loyalteez -->|4. Success Response| Client
+    Client -->|5. Show Notification| User
 ```
 
 **Key Components:**
-- **`src/app/api/manual-event/route.ts`**: The secure proxy that communicates with Loyalteez.
-- **`src/lib/loyalteez.ts`**: A typed utility wrapper for the Loyalteez API.
-- **`src/app/page.tsx`**: Landing page with Newsletter hook.
+- **`src/app/page.tsx`**: Landing page with Newsletter hook (calls API directly).
+- **`src/app/profile/page.tsx`**: Profile page with Completion hook.
+- **`src/app/pricing/page.tsx`**: Pricing page with Upgrade hook.
 
 ---
 
@@ -55,7 +51,7 @@ graph LR
 *   **Language**: TypeScript
 *   **Icons**: [Lucide React](https://lucide.dev/)
 *   **Deployment**: [Cloudflare Pages](https://pages.cloudflare.com/)
-*   **Rewards**: [Loyalteez API](https://docs.loyalteez.app)
+*   **Rewards**: [Loyalteez API](https://docs.loyalteez.app) (`api.loyalteez.app`)
 
 ---
 
@@ -96,32 +92,37 @@ graph LR
 
 ## 📖 Integration Guide
 
-This demo showcases the **best practice** for integrating Loyalteez into a JavaScript framework.
+This demo showcases the **Client-Side Direct API** pattern - the simplest way to integrate Loyalteez.
 
-### 1. The Service Wrapper (`src/lib/loyalteez.ts`)
-
-We use a singleton service class to handle all communication with the Loyalteez API. This ensures consistent error handling, type safety, and centralized configuration.
+### Example: Newsletter Signup
 
 ```typescript
-// Usage example
-import { loyalteez } from '@/lib/loyalteez';
-
-await loyalteez.trackEvent('event_name', 'user@example.com', {
-    metadata_key: 'value'
-});
-```
-
-### 2. Secure Proxy Route (`src/app/api/manual-event/route.ts`)
-
-Never call the Loyalteez API directly from the client-side if you want to keep your logic opaque or handle secrets. Instead, call your own API route.
-
-```typescript
-// Client-side code
-const res = await fetch('/api/manual-event', {
+// Client-side code (React component)
+const res = await fetch('https://api.loyalteez.app/loyalteez-api/manual-event', {
   method: 'POST',
-  body: JSON.stringify({ eventType: 'newsletter_subscribe', userEmail: email }),
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    brandId: process.env.NEXT_PUBLIC_BRAND_ID,
+    eventType: 'newsletter_subscribe',
+    userEmail: email,
+    userIdentifier: email,
+    domain: 'saas-demo.loyalteez.app',
+    sourceUrl: 'https://saas-demo.loyalteez.app',
+    metadata: { source: 'homepage_hero' }
+  }),
 });
+
+const data = await res.json();
+if (data.success) {
+  // Show success message with reward amount
+}
 ```
+
+**Why Client-Side?**
+- ✅ Simpler architecture (no server-side proxy needed)
+- ✅ Brand ID is public anyway (wallet address)
+- ✅ Works reliably across all hosting platforms
+- ✅ Matches the Discord bot pattern
 
 ---
 
@@ -130,14 +131,9 @@ const res = await fetch('/api/manual-event', {
 ```
 src/
 ├── app/
-│   ├── api/
-│   │   ├── manual-event/ # Secure proxy for Loyalteez API calls
-│   │   └── auth/         # Example NextAuth integration point
 │   ├── pricing/          # Pricing page (Upgrade hook)
 │   ├── profile/          # Profile page (Completion hook)
 │   └── page.tsx          # Landing page (Newsletter hook)
-├── lib/
-│   └── loyalteez.ts      # Loyalteez API wrapper service
 └── components/           # UI Components
 ```
 
