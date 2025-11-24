@@ -20,13 +20,15 @@ export default function Home() {
       
       if (!brandId) {
         setStatus('error');
-        setErrorMessage('Brand ID not configured');
+        setErrorMessage('Brand ID not configured. Please set NEXT_PUBLIC_BRAND_ID in Cloudflare Pages settings.');
         return;
       }
 
       const res = await fetch('https://api.loyalteez.app/loyalteez-api/manual-event', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
           brandId: brandId,
           eventType: 'newsletter_subscribe',
@@ -41,20 +43,38 @@ export default function Home() {
         }),
       });
 
+      // Handle non-JSON responses
+      const contentType = res.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await res.text();
+        console.error('Non-JSON response:', text);
+        setStatus('error');
+        setErrorMessage(`Server error: ${res.status} ${res.statusText}`);
+        return;
+      }
+
       const data = await res.json();
 
       if (res.ok && data.success) {
         setStatus('success');
-        setReward(data.ltzDistributed);
+        setReward(data.ltzDistributed || data.rewardAmount || 25);
       } else {
         console.error('Subscription failed:', data);
         setStatus('error');
-        setErrorMessage(data.error || data.details || 'Unknown error');
+        setErrorMessage(data.error || data.message || `Error: ${res.status} ${res.statusText}`);
       }
     } catch (err) {
       console.error('Subscription error:', err);
       setStatus('error');
-      setErrorMessage('Network or server error');
+      
+      // Handle specific error types
+      if (err instanceof TypeError && err.message.includes('fetch')) {
+        setErrorMessage('Network error: Could not reach the API. Please check your connection.');
+      } else if (err instanceof SyntaxError) {
+        setErrorMessage('Invalid response from server. Please try again.');
+      } else {
+        setErrorMessage(err instanceof Error ? err.message : 'An unexpected error occurred. Please try again.');
+      }
     }
   };
 
@@ -119,9 +139,21 @@ export default function Home() {
                 )}
                 
                 {status === 'error' && (
-                  <p className="mt-2 text-sm text-red-600">
-                    {errorMessage || 'Something went wrong. Please try again.'}
-                  </p>
+                  <div className="mt-4 rounded-md bg-red-50 p-4">
+                    <div className="flex">
+                      <div className="flex-shrink-0">
+                        <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      <div className="ml-3">
+                        <h3 className="text-sm font-medium text-red-800">Error</h3>
+                        <div className="mt-2 text-sm text-red-700">
+                          <p>{errorMessage}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 )}
               </div>
               <p className="text-xs text-gray-500">
