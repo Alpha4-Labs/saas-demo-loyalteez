@@ -24,24 +24,43 @@ export default function Home() {
         return;
       }
 
+      // Validate brandId format (should be Ethereum address)
+      if (!brandId.startsWith('0x') || brandId.length !== 42) {
+        setStatus('error');
+        setErrorMessage('Invalid Brand ID format. Must be a valid Ethereum address (0x...).');
+        return;
+      }
+
+      // Prepare payload with all required fields
+      const payload = {
+        brandId: brandId.toLowerCase(), // Normalize to lowercase
+        eventType: 'newsletter_subscribe',
+        userEmail: email,
+        userIdentifier: email, // Provide both for compatibility
+        domain: 'saas-demo.loyalteez.app',
+        sourceUrl: 'https://saas-demo.loyalteez.app',
+        metadata: { 
+          source: 'homepage_hero',
+          timestamp: new Date().toISOString()
+        }
+      };
+
+      console.log('[API] Sending request:', { ...payload, userEmail: '***', userIdentifier: '***' });
+
+      // Use AbortController for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
       const res = await fetch('https://api.loyalteez.app/loyalteez-api/manual-event', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          brandId: brandId,
-          eventType: 'newsletter_subscribe',
-          userEmail: email,
-          userIdentifier: email,
-          domain: 'saas-demo.loyalteez.app',
-          sourceUrl: 'https://saas-demo.loyalteez.app',
-          metadata: { 
-            source: 'homepage_hero',
-            timestamp: new Date().toISOString()
-          }
-        }),
+        body: JSON.stringify(payload),
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       // Handle non-JSON responses
       const contentType = res.headers.get('content-type');
@@ -54,6 +73,7 @@ export default function Home() {
       }
 
       const data = await res.json();
+      console.log('[API] Response:', data);
 
       if (res.ok && data.success) {
         setStatus('success');
@@ -70,6 +90,8 @@ export default function Home() {
       // Handle specific error types
       if (err instanceof TypeError && err.message.includes('fetch')) {
         setErrorMessage('Network error: Could not reach the API. Please check your connection.');
+      } else if (err instanceof DOMException && err.name === 'AbortError') {
+        setErrorMessage('Request timed out. Please try again.');
       } else if (err instanceof SyntaxError) {
         setErrorMessage('Invalid response from server. Please try again.');
       } else {
