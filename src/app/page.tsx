@@ -7,10 +7,12 @@ export default function Home() {
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [reward, setReward] = useState<number | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string>('');
 
   const handleSubscribe = async (e: React.FormEvent) => {
     e.preventDefault();
     setStatus('loading');
+    setErrorMessage('');
 
     try {
       // Call our internal proxy API route (which then calls Loyalteez)
@@ -18,7 +20,7 @@ export default function Home() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          eventType: 'newsletter_subscribe',
+          eventType: 'newsletter_subscribe', // Valid event type (25 LTZ default)
           userEmail: email,
           metadata: { source: 'homepage_hero' }
         }),
@@ -32,10 +34,12 @@ export default function Home() {
       } else {
         console.error('Subscription failed:', data);
         setStatus('error');
+        setErrorMessage(data.error || data.details || 'Unknown error');
       }
     } catch (err) {
       console.error('Subscription error:', err);
       setStatus('error');
+      setErrorMessage('Network or server error');
     }
   };
 
@@ -92,7 +96,7 @@ export default function Home() {
                       <div className="ml-3">
                         <h3 className="text-sm font-medium text-green-800">Subscription confirmed</h3>
                         <div className="mt-2 text-sm text-green-700">
-                          <p>Thanks for subscribing! You've earned <strong>{reward || 10} LTZ</strong> points.</p>
+                          <p>Thanks for subscribing! You've earned <strong>{reward || 25} LTZ</strong> points.</p>
                         </div>
                       </div>
                     </div>
@@ -100,7 +104,9 @@ export default function Home() {
                 )}
                 
                 {status === 'error' && (
-                  <p className="mt-2 text-sm text-red-600">Something went wrong. Please try again.</p>
+                  <p className="mt-2 text-sm text-red-600">
+                    {errorMessage || 'Something went wrong. Please try again.'}
+                  </p>
                 )}
               </div>
               <p className="text-xs text-gray-500">
