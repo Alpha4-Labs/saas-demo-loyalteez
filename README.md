@@ -76,9 +76,12 @@ graph LR
     ```
 
 3.  **Configure Environment**
-    Create a `.env.local` file in the root directory:
+    Copy `.env.example` to `.env.local`:
+    ```bash
+    cp .env.example .env.local
+    ```
+    Then edit `.env.local` and add your Loyalteez Brand ID (get one at [partners.loyalteez.app](https://partners.loyalteez.app)):
     ```env
-    # Your Loyalteez Brand ID (Wallet Address)
     NEXT_PUBLIC_BRAND_ID=0xYourBrandWalletAddress
     ```
 
@@ -123,6 +126,8 @@ if (data.success) {
 - ✅ Brand ID is public anyway (wallet address)
 - ✅ Works reliably across all hosting platforms
 - ✅ Matches the Discord bot pattern
+
+**Note:** In a production app, you'd replace the placeholder `user@example.com` with actual user email from your authentication system. The demo uses placeholders for simplicity.
 
 ---
 
