@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { User, Save } from 'lucide-react';
 
 export default function ProfilePage() {
   const [formData, setFormData] = useState({
@@ -10,44 +9,73 @@ export default function ProfilePage() {
     bio: ''
   });
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [reward, setReward] = useState<number | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string>('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setStatus('loading');
+    setErrorMessage('');
 
     try {
       const brandId = process.env.NEXT_PUBLIC_BRAND_ID || '';
       
       if (!brandId) {
         setStatus('error');
+        setErrorMessage('Brand ID not configured');
         return;
       }
 
-      // Call Loyalteez API directly
+      // In a real app, you'd get the user's email from auth context
+      // For demo purposes, we'll use a placeholder
+      const userEmail = 'user@example.com'; // Replace with actual user email
+
+      const payload = {
+        brandId: brandId.toLowerCase(),
+        eventType: 'profile_completed',
+        userEmail: userEmail,
+        userIdentifier: userEmail,
+        domain: 'saas-demo.loyalteez.app',
+        sourceUrl: 'https://saas-demo.loyalteez.app/profile',
+        metadata: { ...formData }
+      };
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+
       const res = await fetch('https://api.loyalteez.app/loyalteez-api/manual-event', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          brandId: brandId,
-          eventType: 'profile_completed',
-          userEmail: 'demo-user@example.com',
-          userIdentifier: 'demo-user@example.com',
-          domain: 'saas-demo.loyalteez.app',
-          sourceUrl: 'https://saas-demo.loyalteez.app/profile',
-          metadata: { ...formData }
-        }),
+        body: JSON.stringify(payload),
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
+
+      const contentType = res.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await res.text();
+        setStatus('error');
+        setErrorMessage(`Server error: ${res.status} ${res.statusText}`);
+        return;
+      }
 
       const data = await res.json();
 
       if (res.ok && data.success) {
         setStatus('success');
+        setReward(data.ltzDistributed || data.rewardAmount || 50);
       } else {
-        setStatus('success'); // Even if reward fails, profile save might be successful
-        console.error('Reward failed:', data.error);
+        setStatus('error');
+        setErrorMessage(data.error || data.message || 'Failed to save profile');
       }
     } catch (err) {
       setStatus('error');
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        setErrorMessage('Request timed out. Please try again.');
+      } else {
+        setErrorMessage('An error occurred. Please try again.');
+      }
     }
   };
 
@@ -114,13 +142,18 @@ export default function ProfilePage() {
               </div>
             </div>
             <div className="flex items-center justify-between gap-x-6 border-t border-gray-900/5 px-4 py-4 sm:px-8">
-                {status === 'success' && (
-                    <p className="text-sm text-green-600 font-medium">Profile saved & reward earned!</p>
-                )}
+              {status === 'success' && (
+                <p className="text-sm text-green-600 font-medium">
+                  Profile saved! You earned <strong>{reward || 50} LTZ</strong> points.
+                </p>
+              )}
+              {status === 'error' && (
+                <p className="text-sm text-red-600">{errorMessage}</p>
+              )}
               <button
                 type="submit"
                 disabled={status === 'loading'}
-                className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-50"
               >
                 {status === 'loading' ? 'Saving...' : 'Save'}
               </button>

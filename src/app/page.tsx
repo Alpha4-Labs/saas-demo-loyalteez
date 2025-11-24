@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ArrowRight, CheckCircle, Zap } from 'lucide-react';
+import { ArrowRight, CheckCircle } from 'lucide-react';
 
 export default function Home() {
   const [email, setEmail] = useState('');
@@ -15,7 +15,6 @@ export default function Home() {
     setErrorMessage('');
 
     try {
-      // Call Loyalteez API directly (api.loyalteez.app)
       const brandId = process.env.NEXT_PUBLIC_BRAND_ID || '';
       
       if (!brandId) {
@@ -24,19 +23,17 @@ export default function Home() {
         return;
       }
 
-      // Validate brandId format (should be Ethereum address)
       if (!brandId.startsWith('0x') || brandId.length !== 42) {
         setStatus('error');
         setErrorMessage('Invalid Brand ID format. Must be a valid Ethereum address (0x...).');
         return;
       }
 
-      // Prepare payload with all required fields
       const payload = {
-        brandId: brandId.toLowerCase(), // Normalize to lowercase
+        brandId: brandId.toLowerCase(),
         eventType: 'newsletter_subscribe',
         userEmail: email,
-        userIdentifier: email, // Provide both for compatibility
+        userIdentifier: email,
         domain: 'saas-demo.loyalteez.app',
         sourceUrl: 'https://saas-demo.loyalteez.app',
         metadata: { 
@@ -45,11 +42,8 @@ export default function Home() {
         }
       };
 
-      console.log('[API] Sending request:', { ...payload, userEmail: '***', userIdentifier: '***' });
-
-      // Use AbortController for timeout
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
 
       const res = await fetch('https://api.loyalteez.app/loyalteez-api/manual-event', {
         method: 'POST',
@@ -62,32 +56,26 @@ export default function Home() {
 
       clearTimeout(timeoutId);
 
-      // Handle non-JSON responses
       const contentType = res.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
         const text = await res.text();
-        console.error('Non-JSON response:', text);
         setStatus('error');
         setErrorMessage(`Server error: ${res.status} ${res.statusText}`);
         return;
       }
 
       const data = await res.json();
-      console.log('[API] Response:', data);
 
       if (res.ok && data.success) {
         setStatus('success');
         setReward(data.ltzDistributed || data.rewardAmount || 25);
       } else {
-        console.error('Subscription failed:', data);
         setStatus('error');
         setErrorMessage(data.error || data.message || `Error: ${res.status} ${res.statusText}`);
       }
     } catch (err) {
-      console.error('Subscription error:', err);
       setStatus('error');
       
-      // Handle specific error types
       if (err instanceof TypeError && err.message.includes('fetch')) {
         setErrorMessage('Network error: Could not reach the API. Please check your connection.');
       } else if (err instanceof DOMException && err.name === 'AbortError') {

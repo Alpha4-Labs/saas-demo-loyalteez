@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Check, Zap } from 'lucide-react';
+import { Check } from 'lucide-react';
 
 const tiers = [
   {
@@ -50,46 +50,72 @@ function classNames(...classes: string[]) {
 }
 
 export default function PricingPage() {
-  const [status, setStatus] = useState<string>('');
+  const [status, setStatus] = useState<Record<string, 'idle' | 'loading' | 'success' | 'error'>>({});
+  const [reward, setReward] = useState<Record<string, number>>({});
+  const [errorMessage, setErrorMessage] = useState<Record<string, string>>({});
 
-  const handleUpgrade = async (tierName: string) => {
-    setStatus(`Upgrading to ${tierName}...`);
+  const handleUpgrade = async (tierName: string, tierId: string) => {
+    setStatus({ ...status, [tierId]: 'loading' });
+    setErrorMessage({ ...errorMessage, [tierId]: '' });
 
     try {
-        const brandId = process.env.NEXT_PUBLIC_BRAND_ID || '';
-        
-        if (!brandId) {
-            alert('Brand ID not configured');
-            return;
-        }
+      const brandId = process.env.NEXT_PUBLIC_BRAND_ID || '';
+      
+      if (!brandId) {
+        setStatus({ ...status, [tierId]: 'error' });
+        setErrorMessage({ ...errorMessage, [tierId]: 'Brand ID not configured' });
+        return;
+      }
 
-        // Call Loyalteez API directly
-        const res = await fetch('https://api.loyalteez.app/loyalteez-api/manual-event', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                brandId: brandId,
-                eventType: 'subscription_upgrade',
-                userEmail: 'demo-user@example.com',
-                userIdentifier: 'demo-user@example.com',
-                domain: 'saas-demo.loyalteez.app',
-                sourceUrl: 'https://saas-demo.loyalteez.app/pricing',
-                metadata: { tier: tierName, amount: 99.00 }
-            }),
-        });
+      // In a real app, you'd get the user's email from auth context
+      const userEmail = 'user@example.com'; // Replace with actual user email
 
-        const data = await res.json();
-        
-        if (res.ok && data.success) {
-            alert(`Upgraded to ${tierName}! You earned ${data.ltzDistributed || 100} LTZ.`);
-        } else {
-            alert('Upgraded successfully (Reward pending).');
-        }
+      const payload = {
+        brandId: brandId.toLowerCase(),
+        eventType: 'subscription_upgrade',
+        userEmail: userEmail,
+        userIdentifier: userEmail,
+        domain: 'saas-demo.loyalteez.app',
+        sourceUrl: 'https://saas-demo.loyalteez.app/pricing',
+        metadata: { tier: tierName, amount: 99.00 }
+      };
 
-    } catch (e) {
-        alert('Something went wrong.');
-    } finally {
-        setStatus('');
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+      const res = await fetch('https://api.loyalteez.app/loyalteez-api/manual-event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      const contentType = res.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await res.text();
+        setStatus({ ...status, [tierId]: 'error' });
+        setErrorMessage({ ...errorMessage, [tierId]: `Server error: ${res.status}` });
+        return;
+      }
+
+      const data = await res.json();
+      
+      if (res.ok && data.success) {
+        setStatus({ ...status, [tierId]: 'success' });
+        setReward({ ...reward, [tierId]: data.ltzDistributed || data.rewardAmount || 200 });
+      } else {
+        setStatus({ ...status, [tierId]: 'error' });
+        setErrorMessage({ ...errorMessage, [tierId]: data.error || 'Upgrade failed' });
+      }
+    } catch (err) {
+      setStatus({ ...status, [tierId]: 'error' });
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        setErrorMessage({ ...errorMessage, [tierId]: 'Request timed out' });
+      } else {
+        setErrorMessage({ ...errorMessage, [tierId]: 'An error occurred' });
+      }
     }
   };
 
@@ -106,57 +132,72 @@ export default function PricingPage() {
           Choose an affordable plan that's packed with the best features for engaging your audience, creating customer loyalty, and driving sales.
         </p>
         <div className="isolate mx-auto mt-16 grid max-w-md grid-cols-1 gap-y-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
-          {tiers.map((tier) => (
-            <div
-              key={tier.id}
-              className={classNames(
-                tier.mostPopular ? 'ring-2 ring-indigo-600' : 'ring-1 ring-gray-200',
-                'rounded-3xl p-8 xl:p-10'
-              )}
-            >
-              <div className="flex items-center justify-between gap-x-4">
-                <h3
-                  id={tier.id}
-                  className={classNames(
-                    tier.mostPopular ? 'text-indigo-600' : 'text-gray-900',
-                    'text-lg font-semibold leading-8'
-                  )}
-                >
-                  {tier.name}
-                </h3>
-                {tier.mostPopular ? (
-                  <p className="rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold leading-5 text-indigo-600">
-                    Most popular
-                  </p>
-                ) : null}
-              </div>
-              <p className="mt-4 text-sm leading-6 text-gray-600">{tier.description}</p>
-              <p className="mt-6 flex items-baseline gap-x-1">
-                <span className="text-4xl font-bold tracking-tight text-gray-900">{tier.priceMonthly}</span>
-                <span className="text-sm font-semibold leading-6 text-gray-600">/month</span>
-              </p>
-              <button
-                onClick={() => handleUpgrade(tier.name)}
-                aria-describedby={tier.id}
+          {tiers.map((tier) => {
+            const tierStatus = status[tier.id] || 'idle';
+            const tierReward = reward[tier.id];
+            const tierError = errorMessage[tier.id];
+            
+            return (
+              <div
+                key={tier.id}
                 className={classNames(
-                  tier.mostPopular
-                    ? 'bg-indigo-600 text-white shadow-sm hover:bg-indigo-500'
-                    : 'text-indigo-600 ring-1 ring-inset ring-indigo-200 hover:ring-indigo-300',
-                  'mt-6 block w-full rounded-md px-3 py-2 text-center text-sm font-semibold leading-6 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600'
+                  tier.mostPopular ? 'ring-2 ring-indigo-600' : 'ring-1 ring-gray-200',
+                  'rounded-3xl p-8 xl:p-10'
                 )}
               >
-                Buy plan
-              </button>
-              <ul role="list" className="mt-8 space-y-3 text-sm leading-6 text-gray-600">
-                {tier.features.map((feature) => (
-                  <li key={feature} className="flex gap-x-3">
-                    <Check className="h-6 w-5 flex-none text-indigo-600" aria-hidden="true" />
-                    {feature}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+                <div className="flex items-center justify-between gap-x-4">
+                  <h3
+                    id={tier.id}
+                    className={classNames(
+                      tier.mostPopular ? 'text-indigo-600' : 'text-gray-900',
+                      'text-lg font-semibold leading-8'
+                    )}
+                  >
+                    {tier.name}
+                  </h3>
+                  {tier.mostPopular ? (
+                    <p className="rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold leading-5 text-indigo-600">
+                      Most popular
+                    </p>
+                  ) : null}
+                </div>
+                <p className="mt-4 text-sm leading-6 text-gray-600">{tier.description}</p>
+                <p className="mt-6 flex items-baseline gap-x-1">
+                  <span className="text-4xl font-bold tracking-tight text-gray-900">{tier.priceMonthly}</span>
+                  <span className="text-sm font-semibold leading-6 text-gray-600">/month</span>
+                </p>
+                <button
+                  onClick={() => handleUpgrade(tier.name, tier.id)}
+                  aria-describedby={tier.id}
+                  disabled={tierStatus === 'loading' || tierStatus === 'success'}
+                  className={classNames(
+                    tier.mostPopular
+                      ? 'bg-indigo-600 text-white shadow-sm hover:bg-indigo-500'
+                      : 'text-indigo-600 ring-1 ring-inset ring-indigo-200 hover:ring-indigo-300',
+                    'mt-6 block w-full rounded-md px-3 py-2 text-center text-sm font-semibold leading-6 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-50'
+                  )}
+                >
+                  {tierStatus === 'loading' ? 'Processing...' : tierStatus === 'success' ? 'Upgraded!' : 'Buy plan'}
+                </button>
+                {tierStatus === 'success' && tierReward && (
+                  <p className="mt-4 text-sm text-green-600 font-medium">
+                    You earned <strong>{tierReward} LTZ</strong> points!
+                  </p>
+                )}
+                {tierStatus === 'error' && tierError && (
+                  <p className="mt-4 text-sm text-red-600">{tierError}</p>
+                )}
+                <ul role="list" className="mt-8 space-y-3 text-sm leading-6 text-gray-600">
+                  {tier.features.map((feature) => (
+                    <li key={feature} className="flex gap-x-3">
+                      <Check className="h-6 w-5 flex-none text-indigo-600" aria-hidden="true" />
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
