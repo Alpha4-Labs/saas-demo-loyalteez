@@ -1,5 +1,9 @@
 name = "saas-demo-loyalteez"
 compatibility_date = "2024-04-05"
 compatibility_flags = ["nodejs_compat"]
+
+# Cloudflare Pages configuration
 pages_build_output_dir = ".vercel/output/static"
 
+# Environment variables (these should be set in Cloudflare Pages dashboard)
+# NEXT_PUBLIC_BRAND_ID should be set as a Pages Environment Variable
