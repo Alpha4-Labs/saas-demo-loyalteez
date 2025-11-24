@@ -5,7 +5,26 @@ export const runtime = 'edge';
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
+    // Check if NEXT_PUBLIC_BRAND_ID is set in the environment
+    if (!process.env.NEXT_PUBLIC_BRAND_ID) {
+      console.error('NEXT_PUBLIC_BRAND_ID environment variable is missing');
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Server configuration error: NEXT_PUBLIC_BRAND_ID is missing',
+          details: 'Please set this variable in Cloudflare Pages Settings'
+        },
+        { status: 500 }
+      );
+    }
+
+    let body;
+    try {
+        body = await request.json();
+    } catch (e) {
+        return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: 400 });
+    }
+
     const { eventType, userEmail, metadata } = body;
 
     if (!eventType || !userEmail) {
@@ -25,8 +44,9 @@ export async function POST(request: Request) {
     return NextResponse.json(result);
   } catch (error) {
     console.error('API Route Error:', error);
+    // Safely serialize error
     return NextResponse.json(
-      { success: false, error: 'Internal Server Error: ' + (error instanceof Error ? error.message : String(error)) },
+      { success: false, error: 'Internal Server Error', details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     );
   }
