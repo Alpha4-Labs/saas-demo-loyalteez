@@ -24,12 +24,11 @@ export class LoyalteezService {
   private apiUrl: string;
 
   constructor(brandId: string) {
+    if (!brandId || brandId === 'DEMO_BRAND_ID') {
+      throw new Error('LoyalteezService: brandId is required. Set NEXT_PUBLIC_BRAND_ID environment variable.');
+    }
     this.brandId = brandId;
     this.apiUrl = 'https://api.loyalteez.app/loyalteez-api/manual-event';
-    
-    if (this.brandId === 'DEMO_BRAND_ID') {
-        console.warn('[Loyalteez] WARNING: Using default DEMO_BRAND_ID. Events will likely fail. Set NEXT_PUBLIC_BRAND_ID in .env.local');
-    }
   }
 
   /**
@@ -41,17 +40,13 @@ export class LoyalteezService {
     metadata: Record<string, any> = {}
   ): Promise<LoyalteezResponse> {
     try {
-      // NOTE: Server expects specific field names. 
-      // `userEmail` is mapped to `userIdentifier` in some contexts, but manual-event handler supports `userEmail`.
-      // `domain` and `sourceUrl` are validated.
-      
       const payload = {
         brandId: this.brandId,
         eventType: eventType,
         userEmail: userEmail,
-        userIdentifier: userEmail, // Provide both to be safe as per server logic
-        domain: 'saas-demo.loyalteez.app', // Must be a valid looking domain string, not just 'demo-saas'
-        sourceUrl: 'https://saas-demo.loyalteez.app/api/events', // Must be a valid URL
+        userIdentifier: userEmail,
+        domain: 'saas-demo.loyalteez.app',
+        sourceUrl: 'https://saas-demo.loyalteez.app/api/manual-event',
         timestamp: new Date().toISOString(),
         ...metadata
       };
@@ -85,7 +80,6 @@ export class LoyalteezService {
 
     } catch (error) {
       console.error('[Loyalteez] Error tracking event:', error);
-      // Fail gracefully - don't break the app flow
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error'
@@ -94,5 +88,11 @@ export class LoyalteezService {
   }
 }
 
-// Singleton instance for server-side use
-export const loyalteez = new LoyalteezService(process.env.NEXT_PUBLIC_BRAND_ID || 'DEMO_BRAND_ID');
+// Export factory function instead of singleton
+export function createLoyalteezService(): LoyalteezService {
+  const brandId = process.env.NEXT_PUBLIC_BRAND_ID;
+  if (!brandId) {
+    throw new Error('NEXT_PUBLIC_BRAND_ID environment variable is not set');
+  }
+  return new LoyalteezService(brandId);
+}
