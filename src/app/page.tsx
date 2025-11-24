@@ -13,7 +13,8 @@ export default function Home() {
     setStatus('loading');
 
     try {
-      const res = await fetch('/api/events', {
+      // Call our internal proxy API route (which then calls Loyalteez)
+      const res = await fetch('/api/manual-event', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -25,13 +26,15 @@ export default function Home() {
 
       const data = await res.json();
 
-      if (data.success) {
+      if (res.ok && data.success) {
         setStatus('success');
         setReward(data.ltzDistributed);
       } else {
+        console.error('Subscription failed:', data);
         setStatus('error');
       }
     } catch (err) {
+      console.error('Subscription error:', err);
       setStatus('error');
     }
   };
@@ -95,6 +98,10 @@ export default function Home() {
                     </div>
                   </div>
                 )}
+                
+                {status === 'error' && (
+                  <p className="mt-2 text-sm text-red-600">Something went wrong. Please try again.</p>
+                )}
               </div>
               <p className="text-xs text-gray-500">
                 Join our newsletter and earn LTZ rewards immediately.
@@ -110,4 +117,3 @@ export default function Home() {
     </div>
   );
 }
-
