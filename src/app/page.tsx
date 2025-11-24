@@ -15,14 +15,29 @@ export default function Home() {
     setErrorMessage('');
 
     try {
-      // Call our internal proxy API route (which then calls Loyalteez)
-      const res = await fetch('/api/manual-event', {
+      // Call Loyalteez API directly (api.loyalteez.app)
+      const brandId = process.env.NEXT_PUBLIC_BRAND_ID || '';
+      
+      if (!brandId) {
+        setStatus('error');
+        setErrorMessage('Brand ID not configured');
+        return;
+      }
+
+      const res = await fetch('https://api.loyalteez.app/loyalteez-api/manual-event', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          eventType: 'newsletter_subscribe', // Valid event type (25 LTZ default)
+          brandId: brandId,
+          eventType: 'newsletter_subscribe',
           userEmail: email,
-          metadata: { source: 'homepage_hero' }
+          userIdentifier: email,
+          domain: 'saas-demo.loyalteez.app',
+          sourceUrl: 'https://saas-demo.loyalteez.app',
+          metadata: { 
+            source: 'homepage_hero',
+            timestamp: new Date().toISOString()
+          }
         }),
       });
 

@@ -56,23 +56,31 @@ export default function PricingPage() {
     setStatus(`Upgrading to ${tierName}...`);
 
     try {
-        // Mock Payment Processing
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        const brandId = process.env.NEXT_PUBLIC_BRAND_ID || '';
+        
+        if (!brandId) {
+            alert('Brand ID not configured');
+            return;
+        }
 
-        // Call Loyalteez
-        const res = await fetch('/api/events', {
+        // Call Loyalteez API directly
+        const res = await fetch('https://api.loyalteez.app/loyalteez-api/manual-event', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
+                brandId: brandId,
                 eventType: 'subscription_upgrade',
                 userEmail: 'demo-user@example.com',
+                userIdentifier: 'demo-user@example.com',
+                domain: 'saas-demo.loyalteez.app',
+                sourceUrl: 'https://saas-demo.loyalteez.app/pricing',
                 metadata: { tier: tierName, amount: 99.00 }
             }),
         });
 
         const data = await res.json();
         
-        if (data.success) {
+        if (res.ok && data.success) {
             alert(`Upgraded to ${tierName}! You earned ${data.ltzDistributed || 100} LTZ.`);
         } else {
             alert('Upgraded successfully (Reward pending).');
@@ -154,4 +162,3 @@ export default function PricingPage() {
     </div>
   );
 }
-

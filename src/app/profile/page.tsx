@@ -16,27 +16,34 @@ export default function ProfilePage() {
     setStatus('loading');
 
     try {
-      // Simulate saving to DB
-      await new Promise(resolve => setTimeout(resolve, 800));
+      const brandId = process.env.NEXT_PUBLIC_BRAND_ID || '';
+      
+      if (!brandId) {
+        setStatus('error');
+        return;
+      }
 
-      // Call Loyalteez
-      const res = await fetch('/api/events', {
+      // Call Loyalteez API directly
+      const res = await fetch('https://api.loyalteez.app/loyalteez-api/manual-event', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          brandId: brandId,
           eventType: 'profile_completed',
-          userEmail: 'demo-user@example.com', // Mocked logged-in user
+          userEmail: 'demo-user@example.com',
+          userIdentifier: 'demo-user@example.com',
+          domain: 'saas-demo.loyalteez.app',
+          sourceUrl: 'https://saas-demo.loyalteez.app/profile',
           metadata: { ...formData }
         }),
       });
 
       const data = await res.json();
 
-      if (data.success) {
+      if (res.ok && data.success) {
         setStatus('success');
       } else {
-        // Even if reward fails, profile save might be successful in real app
-        setStatus('success'); 
+        setStatus('success'); // Even if reward fails, profile save might be successful
         console.error('Reward failed:', data.error);
       }
     } catch (err) {
@@ -124,4 +131,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-
